@@ -36,37 +36,28 @@ fn load_dictionary<P: AsRef<Path>>(filename: P) -> io::Result<Vec<String>> {
     Ok(words)
 }
 
-fn matches_pattern(word: &str, guess: &str, pattern: &str) -> bool {
-    let w: Vec<char> = word.chars().collect();
-    let g: Vec<char> = guess.chars().collect();
-    let p: Vec<char> = pattern.chars().collect();
-
-    if w.len() != g.len() || g.len() != p.len() {
-        return false;
-    }
-
-    let mut used = vec![false; w.len()];
-    let mut guess_used = vec![false; g.len()];
-
-    for i in 0..w.len() {
-        if p[i] == 'g' || p[i] == 'G' {
-            if w[i] != g[i] {
+fn check_greens(word_chars: &[char], guess_chars: &[char], pattern_chars: &[char], used_in_word: &mut [bool]) -> bool {
+    for i in 0..word_chars.len() {
+        if pattern_chars[i].eq_ignore_ascii_case(&'g') {
+            if word_chars[i] != guess_chars[i] {
                 return false;
             }
-            used[i] = true;
-            guess_used[i] = true;
+            used_in_word[i] = true;
         }
     }
+    true
+}
 
-    for i in 0..w.len() {
-        if p[i] == 'y' || p[i] == 'Y' {
-            if w[i] == g[i] {
+fn check_yellows(word_chars: &[char], guess_chars: &[char], pattern_chars: &[char], used_in_word: &mut [bool]) -> bool {
+    for i in 0..word_chars.len() {
+        if pattern_chars[i].eq_ignore_ascii_case(&'y') {
+            if word_chars[i] == guess_chars[i] {
                 return false;
             }
             let mut found = false;
-            for j in 0..w.len() {
-                if !used[j] && w[j] == g[i] {
-                    used[j] = true;
+            for j in 0..word_chars.len() {
+                if !used_in_word[j] && word_chars[j] == guess_chars[i] && j != i {
+                    used_in_word[j] = true;
                     found = true;
                     break;
                 }
@@ -74,18 +65,43 @@ fn matches_pattern(word: &str, guess: &str, pattern: &str) -> bool {
             if !found {
                 return false;
             }
-            guess_used[i] = true;
         }
     }
+    true
+}
 
-    for i in 0..w.len() {
-        if p[i] == 'b' || p[i] == 'B' {
-            for j in 0..w.len() {
-                if !used[j] && w[j] == g[i] {
+fn check_blacks(word_chars: &[char], guess_chars: &[char], pattern_chars: &[char], used_in_word: &[bool]) -> bool {
+    for i in 0..word_chars.len() {
+        if pattern_chars[i].eq_ignore_ascii_case(&'b') {
+            for j in 0..word_chars.len() {
+                if !used_in_word[j] && word_chars[j] == guess_chars[i] {
                     return false;
                 }
             }
         }
+    }
+    true
+}
+
+fn matches_pattern(word: &str, guess: &str, pattern: &str) -> bool {
+    let word_chars: Vec<char> = word.chars().collect();
+    let guess_chars: Vec<char> = guess.chars().collect();
+    let pattern_chars: Vec<char> = pattern.chars().collect();
+
+    if word_chars.len() != guess_chars.len() || guess_chars.len() != pattern_chars.len() {
+        return false;
+    }
+
+    let mut used_in_word = vec![false; word_chars.len()];
+
+    if !check_greens(&word_chars, &guess_chars, &pattern_chars, &mut used_in_word) {
+        return false;
+    }
+    if !check_yellows(&word_chars, &guess_chars, &pattern_chars, &mut used_in_word) {
+        return false;
+    }
+    if !check_blacks(&word_chars, &guess_chars, &pattern_chars, &used_in_word) {
+        return false;
     }
 
     true
